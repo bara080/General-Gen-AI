@@ -1,24 +1,64 @@
+"""
+Utilities for MongoDB Atlas Vector Search indexing, simple progress tracking,
+provider-scoped environment variable loading, and LLM client factory.
+
+This module is intentionally minimal and side-effect free (except where noted):
+- No global network calls (the `track_progress` HTTP call is commented out).
+- Functions are synchronous and blocking by design.
+
+Do NOT change code structure; documentation and comments only.
+"""
+
 from pymongo.errors import OperationFailure
 from pymongo.collection import Collection
 from langchain_aws import ChatBedrock
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
-import requests
+import requests  # kept for potential future use in track_progress
 from typing import Dict, List
 import time
 import os
+import json
+from datetime import datetime
+from pathlib import Path
+import socket
+import os
 from dotenv import dotenv_values, find_dotenv
 
+# Polling interval (seconds) for index create/delete/ready loops
 SLEEP_TIMER = 5
+
 
 def create_index(collection: Collection, index_name: str, model: Dict) -> None:
     """
-    Create a search index.
+    Create (or recreate) a MongoDB Atlas **Search / Vector Search** index.
 
-    Args:
-        collection (Collection): Target MongoDB collection.
-        index_name (str): Name of the search index.
-        model (Dict): Index definition document.
+    Behavior:
+      - Attempts to create the index with the provided `model` definition.
+      - If the index already exists, it deletes the existing one and recreates it,
+        polling until the deletion is visible via `list_search_indexes()`.
+
+    Parameters
+    ----------
+    collection : Collection
+        Target MongoDB collection (PyMongo Collection object).
+    index_name : str
+        Name of the search index to create.
+    model : Dict
+        Index definition document as expected by Atlas Search
+        (e.g., for vectorSearch: fields[].type/path/numDimensions/similarity).
+
+    Raises
+    ------
+    Exception
+        Re-raises unexpected exceptions during drop/recreate path with context.
+
+    Notes
+    -----
+    - Uses `collection.create_search_index(model=...)` (PyMongo 4.11+).
+    - Uses `collection.drop_search_index(name=...)` followed by polling
+      `collection.list_search_indexes()` until the target name disappears.
+    - Blocking call; polling cadence controlled by `SLEEP_TIMER`.
     """
     try:
         print(f"Creating the {index_name} index")
@@ -29,7 +69,7 @@ def create_index(collection: Collection, index_name: str, model: Dict) -> None:
             print(f"Dropping {index_name} index")
             collection.drop_search_index(name=index_name)
 
-            # Poll for index deletion to complete
+            # Poll for index deletion to complete (eventual consistency safety)
             while True:
                 indexes = list(collection.list_search_indexes())
                 index_exists = any(idx.get("name") == index_name for idx in indexes)
@@ -48,11 +88,22 @@ def create_index(collection: Collection, index_name: str, model: Dict) -> None:
 
 def check_index_ready(collection: Collection, index_name: str) -> None:
     """
-    Poll until the specified search index is READY.
+    Block until the specified Search/Vector Search index reports status **READY**.
 
-    Args:
-        collection (Collection): Target MongoDB collection.
-        index_name (str): Name of the search index to check.
+    Parameters
+    ----------
+    collection : Collection
+        Target MongoDB collection (PyMongo Collection object).
+    index_name : str
+        Name of the search index to check.
+
+    Notes
+    -----
+    - Loops on `collection.list_search_indexes()` and inspects:
+        * presence of `index_name`
+        * `index['status'] == 'READY'`
+    - Prints intermediate statuses (e.g., "BUILDING").
+    - Poll interval controlled by `SLEEP_TIMER`.
     """
     while True:
         indexes = list(collection.list_search_indexes())
@@ -73,35 +124,76 @@ def check_index_ready(collection: Collection, index_name: str) -> None:
         print(f"{index_name} index status: {status}")
         time.sleep(SLEEP_TIMER)
 
-
 def track_progress(task: str, workshop_id: str) -> None:
     """
-    Track progress of a task.
+    Track progress locally (no network).
+    Appends a JSON line to a local log file.
 
-    Args:
-        task (str): Task identifier.
-        workshop_id (str): Workshop or lab identifier.
+    Env (optional):
+      PROGRESS_LOG_PATH = path to log file (default: ./logs/progress.jsonl)
     """
-    print(f"Tracking progress for task {task}")
-    #payload = {"task": task, "workshop_id": workshop_id, "sandbox_id": SANDBOX_NAME}
-    #requests.post(url=PROXY_ENDPOINT, json={"task": "track_progress", "data": payload})
+    import json
+    from datetime import datetime
+    from pathlib import Path
+    import socket
+    import os
 
+    log_path = os.environ.get("PROGRESS_LOG_PATH", "./logs/progress.jsonl")
+    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+
+    record = {
+        "ts": datetime.utcnow().isoformat(),
+        "task": task,
+        "workshop_id": workshop_id,
+        "host": socket.gethostname(),
+        "pid": os.getpid(),
+    }
+
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        print(f"[progress] {task} ({workshop_id}) → {log_path}")
+    except Exception as e:
+        print(f"[progress][error] failed to write log: {e}")
 
 
 def set_env(providers: List[str], passkey: str = "", env_path: str | None = None) -> Dict[str, str]:
     """
-    Load env vars from a local .env file and export only those
-    matching a provider-specific prefix: <PROVIDER>_*
+    Export environment variables scoped by provider prefixes from a `.env` file.
 
-    Example keys in .env:
-      OPENAI_API_KEY=...
-      AZURE_OPENAI_ENDPOINT=...
-      GOOGLE_API_KEY=...
-      OPENAI_API_KEY=..
-      VOYAGEAI_API_KEY=
+    Selection rule:
+      Only keys that start with `<PROVIDER>_` (uppercased) are exported into
+      `os.environ`. This avoids leaking unrelated secrets.
 
-    Usage:
-      set_env(["openai", "azure_openai", "google"])
+    Parameters
+    ----------
+    providers : List[str]
+        Provider slugs, e.g. ["openai", "azure_openai", "google", "voyageai"].
+        Each slug maps to an uppercased prefix `<SLUG>_`.
+    passkey : str, optional
+        Unused here (reserved for workshop flows that gate access). Kept for API
+        compatibility; safe to ignore.
+    env_path : str | None, optional
+        Explicit path to a `.env` file. If None, uses `find_dotenv(usecwd=True)`.
+
+    Returns
+    -------
+    Dict[str, str]
+        Mapping of keys applied into the process environment.
+
+    Expected .env Keys
+    ------------------
+    - OPENAI_API_KEY=...
+    - AZURE_OPENAI_ENDPOINT=...
+    - AZURE_OPENAI_API_KEY=...
+    - GOOGLE_API_KEY=...
+    - VOYAGEAI_API_KEY=...
+    - (any other `<PROVIDER>_*` you require)
+
+    Example
+    -------
+    >>> set_env(["openai", "azure_openai", "google", "voyageai"])
+    {'OPENAI_API_KEY': '***', 'AZURE_OPENAI_ENDPOINT': '***', ...}
     """
     path = env_path or find_dotenv(usecwd=True)
     env = dotenv_values(path)
@@ -119,13 +211,37 @@ def set_env(providers: List[str], passkey: str = "", env_path: str | None = None
 
 def get_llm(provider: str):
     """
-    Return a chat LLM client for the requested provider.
+    Factory for chat LLM clients across multiple providers.
 
-    Args:
-        provider (str): One of 'openai', 'aws', 'google', 'microsoft'.
+    Parameters
+    ----------
+    provider : str
+        One of: 'openai', 'aws', 'google', 'microsoft'.
 
-    Returns:
-        A LangChain chat model compatible client.
+    Returns
+    -------
+    Any
+        A LangChain-compatible chat model instance.
+
+    Models
+    ------
+    - openai    → ChatOpenAI(model="gpt-4o", temperature=0)
+    - aws       → ChatBedrock(model_id="anthropic.claude-3-5-sonnet-20240620-v1:0", region "us-west-2")
+    - google    → ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0)
+    - microsoft → AzureChatOpenAI(azure_endpoint=..., azure_deployment="gpt-4o", api_version="2023-06-01-preview")
+
+    Raises
+    ------
+    Exception
+        If the provider is not one of the supported values.
+
+    Notes
+    -----
+    - Ensure the corresponding environment variables/credentials are set:
+        * OPENAI_API_KEY
+        * AWS credentials (if using Bedrock) via standard AWS env/roles
+        * GOOGLE_API_KEY
+        * AZURE_* (endpoint, key, deployment, api version)
     """
     if provider == "openai":
         return ChatOpenAI(model="gpt-4o", temperature=0)
