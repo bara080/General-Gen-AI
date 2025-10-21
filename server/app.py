@@ -1,31 +1,31 @@
 # server/app.py
 import os
+import dotenv
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 from sse_starlette.sse import EventSourceResponse
 
-# reuse same env/graph build as your script
-os.environ.setdefault("MONGODB_URI", "<your-atlas-uri>")
-os.environ.setdefault("LEXICAL_INDEX_NAME", "lexical")  # optional
+# import your compiled LangGraph app
+# ensure agenticai.py exposes `ai_app` (the compiled graph object)
+from agenticai import ai_app as graph_app
 
-# --- minimal inline build mirroring ai-agent.py (no imports from your demo-run code) ---
-# If you prefer, paste your compiled-graph setup here (agent, tools, route, app = graph.compile()).
-# For brevity assume you placed a small helper in utils to return `compiled_app` and `get_embeddings`.
-from utils_agent_build import compiled_app as graph_app  # <- create once, returns compiled LangGraph app
+# env defaults
+os.environ.setdefault("MONGODB_URI", os.getenv("MONGODB_URL", ""))  # fallback to MONGODB_URL if set
+os.environ.setdefault("LEXICAL_INDEX_NAME", "lexical")
 
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # restrict to your Vercel domain in prod
+    allow_origins=["*"],  # restrict in prod
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 class AskIn(BaseModel):
     query: str
-    thread_id: Optional[str] = None  # to enable memory
+    thread_id: Optional[str] = None
 
 def _run_once(query: str, thread_id: Optional[str] = None) -> str:
     cfg = {"configurable": {"thread_id": thread_id}} if thread_id else {}

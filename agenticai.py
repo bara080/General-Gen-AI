@@ -374,10 +374,10 @@ graph.add_conditional_edges(
 )
 
 # Compile the application (no memory)
-app = graph.compile()
+ai_app = graph.compile()
 
 # Visualize (repr) — retained by request
-app
+ai_app
 
 # =============================================================================
 # 9) Execute (No Memory)
