@@ -155,9 +155,9 @@ def generate_embeddings(text: str) -> List[float]:
     out = vo.multimodal_embed(inputs=[[text]], model="voyage-multimodal-3", input_type="document")
     return out.embeddings[0]
 
-# ============================================
+# ======================================================
 # TODO: ADDING EMBEDDINGS TO EXISTING DATA IN ATLAS
-# ============================================
+# ======================================================
 
 # Field in the documents to embed—in this case, the book cover (image URL)
 field_to_embed = "cover"

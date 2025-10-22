@@ -20,19 +20,43 @@ import os
 import sys
 from pymongo import MongoClient
 import json 
-from .utils.utils import create_index, check_index_ready
-#from utils.utils import create_index, check_index_ready
+
+# # for app
+# from .utils.utils import create_index, check_index_ready
+# from .utils.utils import get_llm
+# from .utils.utils import track_progress, set_env
+# for basic run such as `python agenticai.py`
+
+# for test
+# from utils.utils import create_index, check_index_ready
+# from utils.utils import get_llm
+# from utils.utils import set_env
+# from utils.utils import track_progress, set_env
+# utils imports that work both as package (uvicorn) and as script (python agenticai.py)
+try:
+    # when running via uvicorn with PYTHONPATH=./src
+    from genai.utils.utils import create_index, check_index_ready, get_llm, set_env, track_progress
+except ImportError:
+    # when running the file directly from repo root or src/genai
+    from utils.utils import create_index, check_index_ready, get_llm, set_env, track_progress
+
+
 from typing import Annotated, Dict
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from .utils.utils import get_llm
+
 from langchain_core.messages import ToolMessage
 from pprint import pprint
 from langgraph.graph import END, StateGraph, START
 from IPython.display import Image, display  # noqa: F401 (import retained by request)
 from langgraph.checkpoint.mongodb import MongoDBSaver
-from .utils.utils import track_progress, set_env
+from pathlib import Path
+
+# add near the top
+from dotenv import load_dotenv
+load_dotenv()  # loads .env into os.environ
+
 
 # =============================================================================
 # 0) Environment & Path Setup
@@ -45,14 +69,16 @@ sys.path.append(os.path.join(os.path.dirname(os.getcwd())))
 # MongoDB Connection
 # -----------------------------------------------------------------------------
 # If you are using your own MongoDB Atlas cluster, set MONGODB_URI in env.
-MONGODB_URL = os.environ.get("MONGODB_URI")
-mongodb_client = MongoClient(MONGODB_URL)
-
+MONGO_URL = os.getenv("MONGODB_URL")
+mongodb_client = MongoClient(MONGO_URL)
+print("\n\n")
 print(f"connected successfullty")
+print("\n\n")
 print (mongodb_client)
+print("\n\n")
 #exit(1)
 # Quick connectivity check
-mongodb_client.admin.command("ping")
+#mongodb_client.admin.command("ping")
 
 # =============================================================================
 # 1) Model Provider Setup
@@ -60,12 +86,18 @@ mongodb_client.admin.command("ping")
 # LLM provider and passkey expected by the utils.get_llm and set_env helpers.
 # LLM_PROVIDER can be "aws" / "microsoft" / "google" / "openai" (here "openai").
 
-LLM_PROVIDER = "openai"
+# WRONG (you set provider to an API key string)
+# LLM_PROVIDER = os.getenv("OPENAI_API_KEY")
+# PASSKEY = os.getenv("VOYAGE_API_KEY")
 
-PASSKEY = "voyageai"
+# RIGHT
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
+VOYAGE_KEY = os.getenv("VOYAGEAI_API_KEY")  # exact name in .env
+OPENAI_KEY  = os.getenv("OPENAI_API_KEY")   # if your get_llm needs it
+
 
 # Obtain API keys via helper (keys are set as env vars); do not modify.
-set_env([LLM_PROVIDER, "voyageai"], PASSKEY)
+#set_env([LLM_PROVIDER, "voyageai"], PASSKEY)
 
 
 # =============================================================================
@@ -87,31 +119,83 @@ full_collection = mongodb_client[DB_NAME][FULL_COLLECTION_NAME]
 # -----------------------------------------------------------------------------
 # Load vector-search dataset (embeddings included) → VS_COLLECTION_NAME
 # -----------------------------------------------------------------------------
-with open(f"../data/{VS_COLLECTION_NAME}.json", "r") as data_file:
-    json_data = data_file.read()
-data = json.loads(json_data)
 
-print(f"Deleting existing documents from the {VS_COLLECTION_NAME} collection.")
-vs_collection.delete_many({})
-vs_collection.insert_many(data)
-print(
-    f"{vs_collection.count_documents({})} documents ingested into the {VS_COLLECTION_NAME} collection."
-)
 
+print("\n\n : Setting data path")
+# repo root = src/genai/ -> parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = Path(os.getenv("DATA_DIR", REPO_ROOT / "data"))
+print("\n\n")
+print(f"Data path is DATA_DIR ::  {DATA_DIR}")
+print("\n")
+
+def _p(name: str) -> Path:
+    p = DATA_DIR / name
+    if not p.exists():
+        raise FileNotFoundError(f"Missing data file: {p}")
+    return p
+
+
+
+def seed_and_index():
+    with open(_p(f"{VS_COLLECTION_NAME}.json"), "r") as f:
+        vs_data = json.loads(f.read())
+    vs_collection.delete_many({})
+    vs_collection.insert_many(vs_data)
+
+    with open(_p(f"{FULL_COLLECTION_NAME}.json"), "r") as f:
+        full_data = json.loads(f.read())
+    full_collection.delete_many({})
+    full_collection.insert_many(full_data)
+
+    model = {
+        "name": VS_INDEX_NAME,
+        "type": "vectorSearch",
+        "definition": {"fields": [{"type":"vector","path":"embedding","numDimensions":1024,"similarity":"cosine"}]},
+    }
+    create_index(vs_collection, VS_INDEX_NAME, model)
+    check_index_ready(vs_collection, VS_INDEX_NAME)
+
+if __name__ == "__main__" and os.getenv("SEED_DATA") == "1":
+    seed_and_index()
+
+
+# with open(_p(f"{VS_COLLECTION_NAME}.json"), "r") as data_file:
+#     json_data = data_file.read()
+
+# data = json.loads(json_data)
+
+# print("\n\n")
+# print(f"Deleting existing documents from the {VS_COLLECTION_NAME} collection.")
+# print("\n\n")
+# vs_collection.delete_many({})
+# vs_collection.insert_many(data)
+# print("\n\n")
+# print(
+#     f"{vs_collection.count_documents({})} documents ingested into the {VS_COLLECTION_NAME} collection."
+# )
+# print("\n\n")
 # -----------------------------------------------------------------------------
 # Load full documentation pages → FULL_COLLECTION_NAME
 # -----------------------------------------------------------------------------
-with open(f"../data/{FULL_COLLECTION_NAME}.json", "r") as data_file:
-    json_data = data_file.read()
-data = json.loads(json_data)
+# with open(_p(f"{FULL_COLLECTION_NAME}.json"), "r") as data_file:
+#     json_data = data_file.read()
+# data = json.loads(json_data)
 
-print(f"Deleting existing documents from the {FULL_COLLECTION_NAME} collection.")
-full_collection.delete_many({})
-full_collection.insert_many(data)
+
+
+
+
+# print("\n\n")
+# print(f"Deleting existing documents from the {FULL_COLLECTION_NAME} collection.")
+# full_collection.delete_many({})
+# full_collection.insert_many(data)
+# print("\n\n")
+
 print(
     f"{full_collection.count_documents({})} documents ingested into the {FULL_COLLECTION_NAME} collection."
 )
-
+print("\n\n")
 # =============================================================================
 # 3) Create Atlas Vector Search Index
 # =============================================================================
@@ -139,14 +223,20 @@ create_index(vs_collection, VS_INDEX_NAME, model)
 check_index_ready(vs_collection, VS_INDEX_NAME)
 
 # Track progress (kept as-is)
-track_progress("vs_index_creation", "ai_agents_lab")
+#track_progress("vs_index_creation", "ai_agents_lab")
 
 # =============================================================================
 # 4) Tools (VoyageAI embeddings + MongoDB vector search + page fetch)
 # =============================================================================
 
 # VoyageAI client (used for embedding the user query for retrieval)
-vo = voyageai.Client()
+# stop passing a positional key; just set the module key or rely on env
+# vo = voyageai.Client(PASSKEY)
+if VOYAGE_KEY:
+    import voyageai as _voy
+    _voy.api_key = VOYAGE_KEY
+vo = voyageai.Client()  # reads VOYAGEAI_API_KEY from env/module
+
 
 def get_embeddings(query: str) -> List[float]:
     """
@@ -386,7 +476,6 @@ ai_app
 # =============================================================================
 # 9) Execute (No Memory)
 # =============================================================================
-
 def execute_graph(user_input: str) -> None:
     """
     Stream outputs for a single-turn run (no checkpointing).
@@ -394,20 +483,32 @@ def execute_graph(user_input: str) -> None:
     Args:
         user_input: User question/prompt.
     """
-    for step in app.stream(
+    for step in ai_app.stream(
         {"messages": [{"role": "user", "content": user_input}]},
         stream_mode="values",  # stream entire state each step
     ):
         step["messages"][-1].pretty_print()
 
 # Demo runs
-execute_graph("What are some best practices for data backups in MongoDB?")
-execute_graph("Give me a summary of the page titled Create a MongoDB Deployment")
-
+# print(f"=========== START:: RUNNING DEMO ==============>")
+# print("\n")
+# execute_graph("What are some best practices for data backups in MongoDB?")
+# execute_graph("Give me a summary of the page titled Create a MongoDB Deployment")
+# print("\n")
+# print(f"=========== END ::: RUNNING DEMO ==============>")
+print("\n")
 # =============================================================================
 # 10) Add Memory (MongoDBSaver Checkpointer) and Execute
 # =============================================================================
 
+# checkpointer = MongoDBSaver(mongodb_client)
+# app = graph.compile(checkpointer=checkpointer)
+
+
+# compile non-memory app
+# ai_app = graph.compile()
+
+# memory app
 checkpointer = MongoDBSaver(mongodb_client)
 app = graph.compile(checkpointer=checkpointer)
 
@@ -436,3 +537,44 @@ execute_graph_with_memory(
     "1",
     "What did I just ask you?",
 )
+
+
+if __name__ == "__main__":
+    if os.getenv("RUN_DEMO") == "1":
+        print("=========== START:: RUNNING DEMO ==============>")
+        execute_graph("What are some best practices for data backups in MongoDB?")
+        execute_graph("Give me a summary of the page titled Create a MongoDB Deployment")
+        print("=========== END ::: RUNNING DEMO ==============>")
+
+    if os.getenv("RUN_MEMORY_DEMO") == "1":
+        execute_graph_with_memory("1", "What are some best practices for data backups in MongoDB?")
+        execute_graph_with_memory("1", "What did I just ask you?")
+
+
+
+
+# def execute_graph_with_memory(thread_id: str, user_input: str) -> None:
+#     """
+#     Stream outputs with checkpointing (thread-scoped memory).
+
+#     Args:
+#         thread_id: Unique thread identifier for the conversation.
+#         user_input: User question/prompt.
+#     """
+#     config = {"configurable": {"thread_id": thread_id}}
+#     for step in app.stream(
+#         {"messages": [{"role": "user", "content": user_input}]},
+#         config,  # pass thread config
+#         stream_mode="values",
+#     ):
+#         step["messages"][-1].pretty_print()
+
+# # Example: same thread gets history-aware replies
+# execute_graph_with_memory(
+#     "1",
+#     "What are some best practices for data backups in MongoDB?",
+# )
+# execute_graph_with_memory(
+#     "1",
+#     "What did I just ask you?",
+# )
