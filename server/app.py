@@ -9,11 +9,19 @@ from sse_starlette.sse import EventSourceResponse
 
 # import your compiled LangGraph app
 # ensure agenticai.py exposes `ai_app` (the compiled graph object)
-from agenticai import ai_app as graph_app
+
+from genai.agenticai import ai_app as graph_app
+
+from server.utils_agent_build import compiled_app as graph_app
+
 
 # env defaults
-os.environ.setdefault("MONGODB_URI", os.getenv("MONGODB_URL", ""))  # fallback to MONGODB_URL if set
-os.environ.setdefault("LEXICAL_INDEX_NAME", "lexical")
+url = os.environ.setdefault("MONGODB_URI", os.getenv("MONGODB_URI"))
+
+
+print(url)
+exit(1)
+
 
 app = FastAPI()
 app.add_middleware(

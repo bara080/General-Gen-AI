@@ -19,20 +19,20 @@ from typing import List
 import os
 import sys
 from pymongo import MongoClient
-import json
-from utils import create_index, check_index_ready
+import json 
+from .utils.utils import create_index, check_index_ready
+#from utils.utils import create_index, check_index_ready
 from typing import Annotated, Dict
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from utils import get_llm
+from .utils.utils import get_llm
 from langchain_core.messages import ToolMessage
 from pprint import pprint
 from langgraph.graph import END, StateGraph, START
 from IPython.display import Image, display  # noqa: F401 (import retained by request)
 from langgraph.checkpoint.mongodb import MongoDBSaver
-from utils import track_progress, set_env
-from utils import create_index, check_index_ready  # (kept as-is per structure request)
+from .utils.utils import track_progress, set_env
 
 # =============================================================================
 # 0) Environment & Path Setup
@@ -47,6 +47,10 @@ sys.path.append(os.path.join(os.path.dirname(os.getcwd())))
 # If you are using your own MongoDB Atlas cluster, set MONGODB_URI in env.
 MONGODB_URL = os.environ.get("MONGODB_URI")
 mongodb_client = MongoClient(MONGODB_URL)
+
+print(f"connected successfullty")
+print (mongodb_client)
+#exit(1)
 # Quick connectivity check
 mongodb_client.admin.command("ping")
 

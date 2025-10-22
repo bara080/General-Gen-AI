@@ -43,6 +43,14 @@ venv/
 env/
 ENV/
 
+
+.env
+__pycache__/
+*.pyc
+.logs/
+logs/
+
+
 # Jupyter
 .ipynb_checkpoints
 

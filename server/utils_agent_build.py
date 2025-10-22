@@ -1,6 +1,9 @@
 # utils_agent_build.py
 import importlib.util
 from pathlib import Path
+from genai.utils.utils import get_llm
+# keep rest same; ensure compiled_app is exported
+
 
 # path to ai-agent.py (adjust if needed)
 AGENT_PATH = Path(__file__).parent / "agenticai.py"
