@@ -6,5 +6,5 @@
       "maxDuration": 60
     }
   },
-  "routes": [{ "src": "/(.*)", "dest": "/api/index.py" }]
+  "routes": [{ "src": "/(.*)", "dest": "/api/app.py" }]
 }
