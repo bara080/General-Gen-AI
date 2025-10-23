@@ -12,3 +12,4 @@ Pillow==11.1.0
 fastapi
 uvicorn[standard]
 sse-starlette
+vercel
