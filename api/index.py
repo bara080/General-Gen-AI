@@ -13,6 +13,7 @@ if SYS_SRC not in sys.path:
 # Load environment variables BEFORE importing the graph app, so agenticai
 # picks up the right config (e.g., MONGODB_URL / keys).
 # -----------------------------------------------------------------------------
+#load
 load_dotenv()
 
 # -----------------------------------------------------------------------------
