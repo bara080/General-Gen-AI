@@ -25,7 +25,7 @@ import json
 # -----------------------------------------------------------------------------
 try:
     # when running via uvicorn with PYTHONPATH=./src
-    from genai.utils.utils import create_index, check_index_ready, get_llm, set_env, track_progress
+    from src.utils.utils import create_index, check_index_ready, get_llm, set_env, track_progress
 except ImportError:
     # when running the file directly from repo root or src/genai
     from utils.utils import create_index, check_index_ready, get_llm, set_env, track_progress

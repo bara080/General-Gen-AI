@@ -3,11 +3,20 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Make sibling ../src importable inside the function bundle
-BASE_DIR = os.path.dirname(__file__)
-SYS_SRC = os.path.join(BASE_DIR, "src")
-if SYS_SRC not in sys.path:
-    sys.path.insert(0, SYS_SRC)
+# api/index.py  (your FastAPI entry file)
+
+
+BASE_DIR = os.path.dirname(__file__)           
+SRC_DIR  = os.path.normpath(os.path.join(BASE_DIR, "..", "src"))
+print("\n")
+print(SRC_DIR)
+print("\n")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+from agenticai import ai_app as graph_app
+# ... rest of your FastAPI code unchanged ...
+
 
 # -----------------------------------------------------------------------------
 # Load environment variables BEFORE importing the graph app, so agenticai
@@ -38,7 +47,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from sse_starlette.sse import EventSourceResponse
-from genai.agenticai import ai_app as graph_app
+# from genai.agenticai import ai_app as graph_app
 # -----------------------------------------------------------------------------
 # Import the compiled LangGraph app ONCE. (Avoid importing utils_agent_build.)
 # -----------------------------------------------------------------------------
