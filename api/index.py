@@ -3,14 +3,23 @@ import sys
 from dotenv import load_dotenv
 
 # --- FIX: Add 'src' to system path for correct module imports ---
-# Vercel needs to know where to find the 'src' directory, which contains 'utils/agenticai.py'
+# Vercel needs to find the 'src' directory, which contains 'utils/agenticai.py'.
+# We need the absolute path of 'src' assuming it's a sibling of 'api'.
 if 'src' not in sys.path:
-    # This assumes 'api' and 'src' are siblings in the root directory.
-    sys.path.append(os.path.abspath('src'))
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(current_dir, '..'))
+    src_path = os.path.join(project_root, 'src')
+    sys.path.append(src_path)
 # ---------------------------------------------------------------
 
 # Corrected Import: Now imports from src.utils.agenticai
-from src.utils.agenticai import ai_app as graph_app 
+# Note: The import path uses '.' separator, not '/'
+try:
+    from src.utils.agenticai import ai_app as graph_app 
+except ImportError as e:
+    print(f"FATAL ERROR: Could not import graph app: {e}")
+    # Set to None so the application can still start (and return 500s)
+    graph_app = None
 
 
 # -----------------------------------------------------------------------------
@@ -73,7 +82,7 @@ def _run_once(query: str, thread_id: Optional[str] = None) -> str:
     message content.
     """
     # Defensive check
-    if 'graph_app' not in globals() or not graph_app:
+    if graph_app is None:
         print("ERROR: LangGraph application is not loaded.")
         return "Internal Error: Server function could not initialize."
 
@@ -119,7 +128,7 @@ def stream(inp: AskIn):
     Streams incremental message content from the graph app.
     """
     def gen():
-        if 'graph_app' not in globals() or not graph_app:
+        if graph_app is None:
             yield {"event": "error", "data": "Internal Error: Server function could not initialize."}
             return
             
