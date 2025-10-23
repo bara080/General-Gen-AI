@@ -3,9 +3,7 @@
 import os
 import sys
 from dotenv import load_dotenv
-from agenticai import ai_app as graph_app
-
-
+from utils.agenticai import ai_app as graph_app
 
 
 # -----------------------------------------------------------------------------
