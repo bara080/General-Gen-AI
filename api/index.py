@@ -2,25 +2,34 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Import the graph app. This path assumes 'utils' is in the root directory.
-from utils.agenticai import ai_app as graph_app
+# --- FIX: Add 'src' to system path for correct module imports ---
+# Vercel needs to know where to find the 'src' directory, which contains 'utils/agenticai.py'
+if 'src' not in sys.path:
+    # This assumes 'api' and 'src' are siblings in the root directory.
+    sys.path.append(os.path.abspath('src'))
+# ---------------------------------------------------------------
+
+# Corrected Import: Now imports from src.utils.agenticai
+from src.utils.agenticai import ai_app as graph_app 
+
 
 # -----------------------------------------------------------------------------
 # Load environment variables
 # -----------------------------------------------------------------------------
 load_dotenv()
 
+
 # -----------------------------------------------------------------------------
-# Normalize MongoDB connection URL: Support both URL/URI and prevent build crash
+# Normalize MongoDB connection URL: FIX to prevent Vercel build failure
 # -----------------------------------------------------------------------------
 uri = os.getenv("MONGODB_URL") or os.getenv("MONGODB_URI")
 if not uri:
-    # Set a placeholder to prevent the build from failing, and print a warning.
+    # SOFT FIX: This prevents the Vercel build from crashing (RuntimeError removed).
     print("WARNING: Missing MONGODB_URL/MONGODB_URI in environment. Setting placeholder.")
-    os.environ["MONGODB_URL"] = "mongodb://localhost:27017/placeholder" 
-else:
-    # Ensure it is set to the name the graph code expects
-    os.environ["MONGODB_URL"] = uri
+    uri = "mongodb://localhost:27017/placeholder" 
+    
+os.environ["MONGODB_URL"] = uri
+
 # -----------------------------------------------------------------------------
 # Disable data seeding and demo runs by default
 # -----------------------------------------------------------------------------
@@ -42,7 +51,7 @@ app = FastAPI(root_path="/api")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: restrict in production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -63,8 +72,7 @@ def _run_once(query: str, thread_id: Optional[str] = None) -> str:
     Run a single-turn interaction against the graph app and return the last
     message content.
     """
-    # Defensive check: if graph_app failed to load due to missing dependency/path, 
-    # return an error message instead of crashing the function
+    # Defensive check
     if 'graph_app' not in globals() or not graph_app:
         print("ERROR: LangGraph application is not loaded.")
         return "Internal Error: Server function could not initialize."
@@ -77,7 +85,7 @@ def _run_once(query: str, thread_id: Optional[str] = None) -> str:
         stream_mode="values",
     ):
         msg = state["messages"][-1]
-        # Use .get() for safety and assume content is the field we want
+        # Use robust attribute/key access
         last = getattr(msg, "content", msg.get("content", ""))
     return last
 
@@ -124,8 +132,6 @@ def stream(inp: AskIn):
             msg = state["messages"][-1]
             content = getattr(msg, "content", msg.get("content", ""))
             if content:
-                 # Vercel's EventSourceResponse requires data to be a dict that is JSON serializable
                  yield {"event": "token", "data": content}
                  
-    # EventSourceResponse expects an iterable of dicts or strings with event/data format
     return EventSourceResponse(gen())

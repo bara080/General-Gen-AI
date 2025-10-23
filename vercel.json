@@ -19,13 +19,11 @@
   "routes": [
     {
       "src": "/api/(.*)",
-
       "dest": "/api/index.py"
     },
     {
       "src": "/",
-
-      "dest": "/api/health"
+      "dest": "landing.html"
     },
     {
       "src": "/(.*)",
