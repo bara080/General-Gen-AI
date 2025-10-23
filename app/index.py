@@ -1,9 +1,8 @@
 # server/app.py
+from agenticai import ai_app as graph_app
 import os
 import sys
 from dotenv import load_dotenv
-
-# api/index.py  (your FastAPI entry file)
 
 
 BASE_DIR = os.path.dirname(__file__)           
@@ -14,7 +13,7 @@ print("\n")
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-from agenticai import ai_app as graph_app
+
 # ... rest of your FastAPI code unchanged ...
 
 
@@ -24,6 +23,8 @@ from agenticai import ai_app as graph_app
 # -----------------------------------------------------------------------------
 #load
 load_dotenv()
+
+
 
 # -----------------------------------------------------------------------------
 # Normalize MongoDB connection URL: support both MONGODB_URL and MONGODB_URI
