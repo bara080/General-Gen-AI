@@ -1,15 +1,12 @@
 # server/app.py
-from agenticai import ai_app as graph_app
+
 import os
 import sys
 from dotenv import load_dotenv
+from agenticai import ai_app
 
-
-BASE_DIR = os.path.dirname(__file__)           
-SRC_DIR  = os.path.normpath(os.path.join(BASE_DIR, "..", "src"))
-print("\n")
-print(SRC_DIR)
-print("\n")
+BASE_DIR = os.path.dirname(__file__)          
+SRC_DIR  = os.path.join(BASE_DIR, "src")     
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
