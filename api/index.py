@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 
 # --- FIX: Add 'src' to system path for correct module imports ---
 # Vercel needs to find the 'src' directory, which contains 'utils/agenticai.py'.
-# We need the absolute path of 'src' assuming it's a sibling of 'api'.
 if 'src' not in sys.path:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(current_dir, '..'))
@@ -13,12 +12,10 @@ if 'src' not in sys.path:
 # ---------------------------------------------------------------
 
 # Corrected Import: Now imports from src.utils.agenticai
-# Note: The import path uses '.' separator, not '/'
 try:
     from src.utils.agenticai import ai_app as graph_app 
 except ImportError as e:
     print(f"FATAL ERROR: Could not import graph app: {e}")
-    # Set to None so the application can still start (and return 500s)
     graph_app = None
 
 
@@ -33,7 +30,7 @@ load_dotenv()
 # -----------------------------------------------------------------------------
 uri = os.getenv("MONGODB_URL") or os.getenv("MONGODB_URI")
 if not uri:
-    # SOFT FIX: This prevents the Vercel build from crashing (RuntimeError removed).
+    # SOFT FIX: This prevents the Vercel build from crashing.
     print("WARNING: Missing MONGODB_URL/MONGODB_URI in environment. Setting placeholder.")
     uri = "mongodb://localhost:27017/placeholder" 
     
@@ -81,7 +78,6 @@ def _run_once(query: str, thread_id: Optional[str] = None) -> str:
     Run a single-turn interaction against the graph app and return the last
     message content.
     """
-    # Defensive check
     if graph_app is None:
         print("ERROR: LangGraph application is not loaded.")
         return "Internal Error: Server function could not initialize."
@@ -94,7 +90,6 @@ def _run_once(query: str, thread_id: Optional[str] = None) -> str:
         stream_mode="values",
     ):
         msg = state["messages"][-1]
-        # Use robust attribute/key access
         last = getattr(msg, "content", msg.get("content", ""))
     return last
 
