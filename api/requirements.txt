@@ -13,3 +13,5 @@ fastapi
 uvicorn[standard]
 sse-starlette
 vercel
+python-dotenv
+
