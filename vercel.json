@@ -5,19 +5,23 @@
       "src": "api/index.py",
       "use": "@vercel/python",
       "config": {
-        "runtime": "python3.12",
-        "includeFiles": ["utils/**", "src/**", "data/**", "requirements.txt"]
+        "runtime": "python3.12"
       }
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "api/index.py"
+      "src": "/",
+      "dest": "/landing.html"
     },
     {
-      "src": "/",
-      "dest": "landing.html"
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
     }
-  ]
+  ],
+  "functions": {
+    "api/index.py": {
+      "includeFiles": ["src/**", "data/**", "requirements.txt"]
+    }
+  }
 }
