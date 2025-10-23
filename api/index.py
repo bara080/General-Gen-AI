@@ -1,6 +1,13 @@
 # server/app.py
 import os
+import sys
 from dotenv import load_dotenv
+
+# Make sibling ../src importable inside the function bundle
+BASE_DIR = os.path.dirname(__file__)
+SYS_SRC = os.path.join(BASE_DIR, "src")
+if SYS_SRC not in sys.path:
+    sys.path.insert(0, SYS_SRC)
 
 # -----------------------------------------------------------------------------
 # Load environment variables BEFORE importing the graph app, so agenticai
@@ -34,12 +41,14 @@ from sse_starlette.sse import EventSourceResponse
 # -----------------------------------------------------------------------------
 # Import the compiled LangGraph app ONCE. (Avoid importing utils_agent_build.)
 # -----------------------------------------------------------------------------
-from src.genai.agenticai import ai_app as graph_app
+from genai.agenticai import ai_app as graph_app
 
 # -----------------------------------------------------------------------------
 # FastAPI setup
 # -----------------------------------------------------------------------------
 #app = FastAPI(root_path="/api")
+
+
 
 app = FastAPI()
 app.add_middleware(
