@@ -34,7 +34,7 @@ from sse_starlette.sse import EventSourceResponse
 # -----------------------------------------------------------------------------
 # Import the compiled LangGraph app ONCE. (Avoid importing utils_agent_build.)
 # -----------------------------------------------------------------------------
-from genai.agenticai import ai_app as graph_app
+from src.genai.agenticai import ai_app as graph_app
 
 # -----------------------------------------------------------------------------
 # FastAPI setup
