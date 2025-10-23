@@ -6,15 +6,18 @@
       "use": "@vercel/python",
       "config": {
         "runtime": "python3.12",
-        "includeFiles": [
-          "utils/**",
-          "pipelines/**",
-          "scripts/**",
-          "data/**",
-          "requirements.txt"
-        ]
+        "includeFiles": ["utils/**", "src/**", "data/**", "requirements.txt"]
       }
     }
   ],
-  "routes": [{ "src": "/api/(.*)", "dest": "api/index.py" }]
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/",
+      "dest": "landing.html"
+    }
+  ]
 }
