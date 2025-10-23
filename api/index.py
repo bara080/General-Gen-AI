@@ -39,6 +39,8 @@ from genai.agenticai import ai_app as graph_app
 # -----------------------------------------------------------------------------
 # FastAPI setup
 # -----------------------------------------------------------------------------
+#app = FastAPI(root_path="/api")
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
