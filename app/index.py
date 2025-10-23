@@ -52,9 +52,9 @@ from sse_starlette.sse import EventSourceResponse
 # -----------------------------------------------------------------------------
 #app = FastAPI(root_path="/api")
 
+app = FastAPI(root_path="/api")
 
-
-app = FastAPI()
+#app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # TODO: restrict in production
