@@ -38,14 +38,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from sse_starlette.sse import EventSourceResponse
-
+from src.genai.agenticai import ai_app as graph_app
 # -----------------------------------------------------------------------------
 # Import the compiled LangGraph app ONCE. (Avoid importing utils_agent_build.)
 # -----------------------------------------------------------------------------
-try:
-    from src.genai.agenticai import ai_app as graph_app
-except ImportError:
-    from genai.agenticai import ai_app as graph_app
+# try:
+#     from src.genai.agenticai import ai_app as graph_app
+# except ImportError:
+#     from genai.agenticai import ai_app as graph_app
     
 
 # -----------------------------------------------------------------------------
